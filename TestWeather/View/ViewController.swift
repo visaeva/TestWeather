@@ -128,6 +128,12 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 		view.addSubview(activityIndicator)
 	}
 	
+	private func updateUI() {
+		hourlyCollectionView.reloadData()
+		weeklyCollectionView.reloadData()
+		activityIndicator.stopAnimating()
+	}
+	
 	private func setupConstraints() {
 		NSLayoutConstraint.activate([
 			backgroundImage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -205,21 +211,46 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 				switch result {
 				case .success(let response):
 					self.forecast = response
-					self.hourlyData = response.forecast.forecastday.first?.hour ?? []
+					self.hourlyData = response.forecast.forecastday.count >= 2 ? self.filterHourlyData(from: response.forecast.forecastday) : []
 					self.weeklyData = response.forecast.forecastday
-					self.hourlyCollectionView.reloadData()
-					self.weeklyCollectionView.reloadData()
-					self.activityIndicator.stopAnimating()
+					self.updateUI()
 				case .failure:
 					self.hourlyData = []
 					self.weeklyData = []
-					self.hourlyCollectionView.reloadData()
-					self.weeklyCollectionView.reloadData()
-					self.activityIndicator.stopAnimating()
+					self.updateUI()
 					self.showErrorAlert(lat: lat, lon: lon)
 				}
 			}
 		}
+	}
+	
+	private func filterHourlyData(from forecastDays: [ForecastDay]) -> [HourWeather] {
+		let now = Date()
+		let calendar = Calendar.current
+		let currentHour = calendar.component(.hour, from: now)
+		let formatter = DateFormatter()
+		formatter.dateFormat = "yyyy-MM-dd"
+		let currentDateString = formatter.string(from: now)
+		
+		var filteredData: [HourWeather] = []
+		
+		if let today = forecastDays.first {
+			let todayHours = today.hour.filter { hour in
+				guard let hourDate = formatter.date(from: String(hour.time.split(separator: " ").first ?? "")),
+					  let hourString = hour.time.split(separator: " ").last,
+					  let hourValue = Int(hourString.split(separator: ":").first ?? "0") else {
+					return false
+				}
+				return formatter.string(from: hourDate) == currentDateString && hourValue >= currentHour
+			}
+			filteredData.append(contentsOf: todayHours)
+		}
+		
+		if forecastDays.count > 1 {
+			filteredData.append(contentsOf: forecastDays[1].hour)
+		}
+		
+		return filteredData
 	}
 	// MARK: - Alert
 	private func showErrorAlert(lat: Double, lon: Double) {
