@@ -6,8 +6,10 @@
 //
 
 import UIKit
+import CoreLocation
 
-final class ViewController: UIViewController {
+final class ViewController: UIViewController, CLLocationManagerDelegate {
+	private let locationManager: CLLocationManager = CLLocationManager()
 	private var hourlyData: [HourWeather] = []
 	private var weeklyData: [ForecastDay] = []
 	private var currentWeather: CurrentWeatherResponse?
@@ -25,7 +27,7 @@ final class ViewController: UIViewController {
 	
 	private lazy var cityLabel: UILabel = {
 		let label = UILabel()
-		label.text = "Moscow"
+		label.text = "Загружаю..."
 		label.font = .systemFont(ofSize: 28, weight: .semibold)
 		label.textColor = .white
 		label.textAlignment = .center
@@ -35,7 +37,7 @@ final class ViewController: UIViewController {
 	
 	private lazy var temperatureLabel: UILabel = {
 		let label = UILabel()
-		label.text = "18°C"
+		label.text = "--°C"
 		label.font = .systemFont(ofSize: 55, weight: .light)
 		label.textColor = .white
 		label.textAlignment = .center
@@ -45,7 +47,7 @@ final class ViewController: UIViewController {
 	
 	private lazy var weatherDescriptionLabel: UILabel = {
 		let label = UILabel()
-		label.text = "Cloudy"
+		label.text = "Загружаю..."
 		label.font = .systemFont(ofSize: 18, weight: .regular)
 		label.textColor = .white
 		label.textAlignment = .center
@@ -74,7 +76,6 @@ final class ViewController: UIViewController {
 		collectionView.dataSource = self
 		collectionView.delegate = self
 		collectionView.translatesAutoresizingMaskIntoConstraints = false
-		
 		return collectionView
 	}()
 	
@@ -91,6 +92,16 @@ final class ViewController: UIViewController {
 		return collectionView
 	}()
 	
+	private lazy var activityIndicator: UIActivityIndicatorView = {
+		let activityIndicator = UIActivityIndicatorView()
+		activityIndicator.style = .large
+		activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+		activityIndicator.hidesWhenStopped = true
+		activityIndicator.color = .white
+		activityIndicator.startAnimating()
+		return activityIndicator
+	}()
+	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		setupUI()
@@ -99,9 +110,10 @@ final class ViewController: UIViewController {
 		hourlyCollectionView.register(HourlyCell.self, forCellWithReuseIdentifier: "HourlyCell")
 		weeklyCollectionView.register(WeeklyCollectionCell.self, forCellWithReuseIdentifier: "WeeklyCollectionCell")
 		
-		fetchCurrentWeather(lat: 11.7833, lon: 107.2833)
-		fetchForecast(lat: 11.7833, lon: 107.2833)
-		
+		locationManager.delegate = self
+		locationManager.desiredAccuracy = kCLLocationAccuracyBest
+		locationManager.requestWhenInUseAuthorization()
+		locationManager.startUpdatingLocation()
 	}
 	
 	private func setupUI() {
@@ -112,6 +124,7 @@ final class ViewController: UIViewController {
 		view.addSubview(weatherIcon)
 		view.addSubview(hourlyCollectionView)
 		view.addSubview(weeklyCollectionView)
+		view.addSubview(activityIndicator)
 	}
 	
 	private func setupConstraints() {
@@ -146,8 +159,19 @@ final class ViewController: UIViewController {
 			weeklyCollectionView.topAnchor.constraint(equalTo: hourlyCollectionView.bottomAnchor, constant: 24),
 			weeklyCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
 			weeklyCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-			weeklyCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
+			weeklyCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
+			
+			activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+			activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
 		])
+	}
+	
+	private func fetchWeatherForMoscow() {
+		let moscowLat = 55.7558
+		let moscowLon = 37.6173
+		cityLabel.text = "Москва"
+		fetchCurrentWeather(lat: moscowLat, lon: moscowLon)
+		fetchForecast(lat: moscowLat, lon: moscowLon)
 	}
 	
 	private func fetchCurrentWeather(lat: Double, lon: Double) {
@@ -158,14 +182,15 @@ final class ViewController: UIViewController {
 				case .success(let response):
 					self.currentWeather = response
 					self.cityLabel.text = response.location.name
-					self.temperatureLabel.text = "\(response.current.tempC)°C"
+					self.temperatureLabel.text = "\(Int(response.current.tempC))°C"
 					self.weatherDescriptionLabel.text = response.current.condition.text
 					let iconPath = response.current.condition.icon
 					self.weatherIcon.setImage(from: iconPath)
-					
-				case .failure:
-					self.cityLabel.text = "Error"
+					self.activityIndicator.stopAnimating()
+				case .failure(let error):
+					self.cityLabel.text = "Ошибка"
 					self.temperatureLabel.text = "--°C"
+					self.activityIndicator.stopAnimating()
 				}
 			}
 		}
@@ -181,20 +206,51 @@ final class ViewController: UIViewController {
 					self?.weeklyData = response.forecast.forecastday
 					self?.hourlyCollectionView.reloadData()
 					self?.weeklyCollectionView.reloadData()
-					
-				case .failure:
+					self?.activityIndicator.stopAnimating()
+				case .failure(let error):
 					self?.hourlyData = []
 					self?.weeklyData = []
 					self?.hourlyCollectionView.reloadData()
 					self?.weeklyCollectionView.reloadData()
+					self?.activityIndicator.stopAnimating()
 				}
 			}
 		}
 	}
+	
+	// MARK: - CLLocationManagerDelegate
+	func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+		guard let currentLocation = locations.last else {
+			print("Не удалось получить местоположение из списка локаций")
+			fetchWeatherForMoscow()
+			return
+		}
+		
+		if currentLocation.horizontalAccuracy > 0 {
+			locationManager.stopUpdatingLocation()
+			let latitude = currentLocation.coordinate.latitude
+			let longitude = currentLocation.coordinate.longitude
+			fetchCurrentWeather(lat: latitude, lon: longitude)
+			fetchForecast(lat: latitude, lon: longitude)
+		} else {
+			fetchWeatherForMoscow()
+		}
+	}
+	
+	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+		let status = manager.authorizationStatus
+		switch status {
+		case .authorizedWhenInUse, .authorizedAlways:
+			locationManager.startUpdatingLocation()
+		case .denied, .restricted:
+			fetchWeatherForMoscow()
+		case .notDetermined:
+			break
+		@unknown default:
+			fetchWeatherForMoscow()
+		}
+	}
 }
-
-
-
 
 extension ViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 	func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -213,7 +269,7 @@ extension ViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 			cell.configure(
 				time: String(time),
 				iconUrl: data.condition.icon,
-				temperature: "\(data.tempC)°C"
+				temperature: "\(Int(data.tempC))°C"
 			)
 			return cell
 		} else {
@@ -222,7 +278,7 @@ extension ViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 			cell.configure(
 				date: data.date,
 				iconUrl: data.day.condition.icon,
-				temperature: "\(data.day.maxtempC)°C",
+				temperature: "\(Int(data.day.maxtempC))°C",
 				condition: data.day.condition.text
 			)
 			return cell

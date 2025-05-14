@@ -66,4 +66,9 @@ class NetworkService {
 			}
 		}.resume()
 	}
+	
+	func startFetchingData(latitude: Double, longitude: Double) {
+		fetchCurrentWeather(lat: latitude, lon: longitude) { _ in }
+		fetchForecast(lat: latitude, lon: longitude) { _ in }
+	}
 }
