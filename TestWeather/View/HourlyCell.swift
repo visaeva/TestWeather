@@ -73,4 +73,18 @@ final class HourlyCell: UICollectionViewCell {
 			tempLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
 		])
 	}
+	
+	func configure(time: String, iconName: String, temperature: String) {
+		timeLabel.text = time
+		tempLabel.text = temperature
+		if let url = URL(string: "https:\(iconName)") {
+			URLSession.shared.dataTask(with: url) { data, _, _ in
+				if let data = data, let image = UIImage(data: data) {
+					DispatchQueue.main.async {
+						self.iconImageView.image = image
+					}
+				}
+			}.resume()
+		}
+	}
 }
