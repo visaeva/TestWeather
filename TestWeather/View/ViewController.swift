@@ -8,6 +8,13 @@
 import UIKit
 
 final class ViewController: UIViewController {
+	private var hourlyData: [HourWeather] = []
+	private var weeklyData: [ForecastDay] = []
+	private var currentWeather: CurrentWeatherResponse?
+	private var forecast: ForecastWeatherResponse?
+	
+	private let networkService = NetworkService()
+	
 	private lazy var backgroundImage: UIImageView = {
 		let image = UIImageView()
 		image.image = UIImage(named: "background")
@@ -84,45 +91,6 @@ final class ViewController: UIViewController {
 		return collectionView
 	}()
 	
-	private let hourlyData: [(time: String, temp: String, icon: String)] = [
-		("12:00", "22.9°C", "cloud.fog.fill"),
-		("13:00", "23.1°C", "cloud.fill"),
-		("14:00", "23.5°C", "cloud.sun.fill"),
-		("15:00", "24.0°C", "sun.max.fill"),
-		("16:00", "23.8°C", "cloud.rain.fill"),
-		("17:00", "23.6°C", "cloud.fill"),
-		("18:00", "23.2°C", "cloud.fog.fill"),
-		("19:00", "22.9°C", "cloud.fill"),
-		("20:00", "22.7°C", "cloud.sun.fill"),
-		("21:00", "22.5°C", "cloud.fog.fill"),
-		("22:00", "22.3°C", "cloud.fill"),
-		("23:00", "22.1°C", "cloud.rain.fill"),
-		("00:00", "22.0°C", "cloud.fog.fill"),
-		("01:00", "21.9°C", "cloud.fill"),
-		("02:00", "21.8°C", "cloud.sun.fill"),
-		("03:00", "21.7°C", "cloud.fog.fill"),
-		("04:00", "21.6°C", "cloud.fill"),
-		("05:00", "21.5°C", "cloud.rain.fill"),
-		("06:00", "21.6°C", "cloud.sun.fill"),
-		("07:00", "21.8°C", "sun.max.fill"),
-		("08:00", "22.0°C", "cloud.fill"),
-		("09:00", "22.3°C", "cloud.fog.fill"),
-		("10:00", "22.6°C", "cloud.sun.fill"),
-		("11:00", "22.8°C", "cloud.fill")
-	]
-	
-	private let weeklyData: [(date: String, temp: String, condition: String, icon: String)] = [
-		("2025-05-14", "22.9°C", "Fog", "cloud.fog.fill"),
-		("2025-05-15", "24.0°C", "Cloudy", "cloud.fill"),
-		("2025-05-16", "25.5°C", "Sunny", "sun.max.fill"),
-		("2025-05-17", "23.8°C", "Rain", "cloud.rain.fill"),
-		("2025-05-18", "26.1°C", "Partly Cloudy", "cloud.sun.fill"),
-		("2025-05-19", "22.5°C", "Fog", "cloud.fog.fill"),
-		("2025-05-20", "24.7°C", "Sunny", "sun.max.fill")
-	]
-	
-	private let networkService = NetworkService()
-	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		setupUI()
@@ -134,44 +102,6 @@ final class ViewController: UIViewController {
 		fetchCurrentWeather(lat: 11.7833, lon: 107.2833)
 		fetchForecast(lat: 11.7833, lon: 107.2833)
 		
-	}
-	private func fetchCurrentWeather(lat: Double, lon: Double) {
-		networkService.fetchCurrentWeather(lat: lat, lon: lon) { result in
-			switch result {
-			case .success(let response):
-				print("Current Weather for \(response.location.name):")
-				print("Temperature: \(response.current.tempC)°C")
-				print("Condition: \(response.current.condition.text)")
-				print("Humidity: \(response.current.humidity)%")
-				print("Feels like: \(response.current.feelslikeC)°C")
-				print("Last updated: \(response.current.lastUpdated)")
-			case .failure(let error):
-				print("Error fetching current weather: \(error.localizedDescription)")
-			}
-		}
-	}
-	
-	private func fetchForecast(lat: Double, lon: Double) {
-		networkService.fetchForecast(lat: lat, lon: lon) { result in
-			switch result {
-			case .success(let response):
-				print("\n7-Day Forecast for \(response.location.name):")
-				for day in response.forecast.forecastday {
-					print("Date: \(day.date)")
-					print("Max Temp: \(day.day.maxtempC)°C")
-					print("Min Temp: \(day.day.mintempC)°C")
-					print("Condition: \(day.day.condition.text)")
-					print("Hourly Forecast:")
-					for hour in day.hour {
-						print("  Time: \(hour.time)")
-						print("  Temp: \(hour.tempC)°C")
-						print("  Condition: \(hour.condition.text)")
-					}
-				}
-			case .failure(let error):
-				print("Error fetching forecast: \(error.localizedDescription)")
-			}
-		}
 	}
 	
 	private func setupUI() {
@@ -219,6 +149,48 @@ final class ViewController: UIViewController {
 			weeklyCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
 		])
 	}
+	
+	private func fetchCurrentWeather(lat: Double, lon: Double) {
+		networkService.fetchCurrentWeather(lat: lat, lon: lon) { [weak self] result in
+			DispatchQueue.main.async {
+				guard let self = self else { return }
+				switch result {
+				case .success(let response):
+					self.currentWeather = response
+					self.cityLabel.text = response.location.name
+					self.temperatureLabel.text = "\(response.current.tempC)°C"
+					self.weatherDescriptionLabel.text = response.current.condition.text
+					let iconPath = response.current.condition.icon
+					self.weatherIcon.setImage(from: iconPath)
+					
+				case .failure:
+					self.cityLabel.text = "Error"
+					self.temperatureLabel.text = "--°C"
+				}
+			}
+		}
+	}
+	
+	private func fetchForecast(lat: Double, lon: Double) {
+		networkService.fetchForecast(lat: lat, lon: lon) { [weak self] result in
+			DispatchQueue.main.async {
+				switch result {
+				case .success(let response):
+					self?.forecast = response
+					self?.hourlyData = response.forecast.forecastday.first?.hour ?? []
+					self?.weeklyData = response.forecast.forecastday
+					self?.hourlyCollectionView.reloadData()
+					self?.weeklyCollectionView.reloadData()
+					
+				case .failure:
+					self?.hourlyData = []
+					self?.weeklyData = []
+					self?.hourlyCollectionView.reloadData()
+					self?.weeklyCollectionView.reloadData()
+				}
+			}
+		}
+	}
 }
 
 
@@ -237,12 +209,22 @@ extension ViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 		if collectionView == hourlyCollectionView {
 			let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "HourlyCell", for: indexPath) as! HourlyCell
 			let data = hourlyData[indexPath.item]
-			cell.configure(time: data.time, iconName: data.icon, temperature: data.temp)
+			let time = data.time.split(separator: " ").last ?? ""
+			cell.configure(
+				time: String(time),
+				iconUrl: data.condition.icon,
+				temperature: "\(data.tempC)°C"
+			)
 			return cell
 		} else {
 			let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "WeeklyCollectionCell", for: indexPath) as! WeeklyCollectionCell
 			let data = weeklyData[indexPath.item]
-			cell.configure(date: data.date, iconName: data.icon, temperature: data.temp, condition: data.condition)
+			cell.configure(
+				date: data.date,
+				iconUrl: data.day.condition.icon,
+				temperature: "\(data.day.maxtempC)°C",
+				condition: data.day.condition.text
+			)
 			return cell
 		}
 	}

@@ -83,18 +83,11 @@ final class WeeklyCollectionCell: UICollectionViewCell {
 		])
 	}
 	
-	func configure(date: String, iconName: String, temperature: String, condition: String) {
+	func configure(date: String, iconUrl: String, temperature: String, condition: String) {
 		dateLabel.text = date
-		tempLabel.text = temperature
 		conditionLabel.text = condition
-		if let url = URL(string: "https:\(iconName)") {
-			URLSession.shared.dataTask(with: url) { data, _, _ in
-				if let data = data, let image = UIImage(data: data) {
-					DispatchQueue.main.async {
-						self.iconImageView.image = image
-					}
-				}
-			}.resume()
-		}
+		tempLabel.text = temperature
+		iconImageView.setImage(from: iconUrl)
 	}
+	
 }

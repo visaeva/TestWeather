@@ -74,17 +74,10 @@ final class HourlyCell: UICollectionViewCell {
 		])
 	}
 	
-	func configure(time: String, iconName: String, temperature: String) {
+	func configure(time: String, iconUrl: String, temperature: String) {
 		timeLabel.text = time
 		tempLabel.text = temperature
-		if let url = URL(string: "https:\(iconName)") {
-			URLSession.shared.dataTask(with: url) { data, _, _ in
-				if let data = data, let image = UIImage(data: data) {
-					DispatchQueue.main.async {
-						self.iconImageView.image = image
-					}
-				}
-			}.resume()
-		}
+		iconImageView.setImage(from: iconUrl)
 	}
+	
 }
