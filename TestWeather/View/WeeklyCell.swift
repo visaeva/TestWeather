@@ -8,7 +8,7 @@
 import UIKit
 
 final class WeeklyCollectionCell: UICollectionViewCell {
-	
+	// MARK: - Properties
 	private let dateLabel: UILabel = {
 		let label = UILabel()
 		label.text = "2025-05-14"
@@ -45,6 +45,7 @@ final class WeeklyCollectionCell: UICollectionViewCell {
 		return label
 	}()
 	
+	// MARK: - Initialization
 	override init(frame: CGRect) {
 		super.init(frame: frame)
 		setupUI()
@@ -55,6 +56,7 @@ final class WeeklyCollectionCell: UICollectionViewCell {
 		fatalError("init(coder:) has not been implemented")
 	}
 	
+	// MARK: - UI Setup
 	private func setupUI() {
 		contentView.addSubview(dateLabel)
 		contentView.addSubview(iconImageView)
@@ -83,6 +85,7 @@ final class WeeklyCollectionCell: UICollectionViewCell {
 		])
 	}
 	
+	// MARK: - Configuration
 	func configure(date: String, iconUrl: String, temperature: String, condition: String) {
 		dateLabel.text = date
 		conditionLabel.text = condition

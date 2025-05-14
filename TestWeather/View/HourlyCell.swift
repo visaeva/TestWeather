@@ -8,7 +8,7 @@
 import UIKit
 
 final class HourlyCell: UICollectionViewCell {
-	
+	// MARK: - Properties
 	private let timeLabel: UILabel = {
 		let label = UILabel()
 		label.text = "12:00"
@@ -37,7 +37,7 @@ final class HourlyCell: UICollectionViewCell {
 		label.translatesAutoresizingMaskIntoConstraints = false
 		return label
 	}()
-	
+	// MARK: - Initialization
 	override init(frame: CGRect) {
 		super.init(frame: frame)
 		setupUI()
@@ -48,7 +48,7 @@ final class HourlyCell: UICollectionViewCell {
 		fatalError("init(coder:) has not been implemented")
 	}
 	
-	
+	// MARK: - UI Setup
 	private func setupUI() {
 		contentView.addSubview(timeLabel)
 		contentView.addSubview(iconImageView)
@@ -73,7 +73,7 @@ final class HourlyCell: UICollectionViewCell {
 			tempLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
 		])
 	}
-	
+	// MARK: - Configuration
 	func configure(time: String, iconUrl: String, temperature: String) {
 		timeLabel.text = time
 		tempLabel.text = temperature

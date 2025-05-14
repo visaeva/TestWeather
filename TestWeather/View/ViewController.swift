@@ -9,6 +9,7 @@ import UIKit
 import CoreLocation
 
 final class ViewController: UIViewController, CLLocationManagerDelegate {
+	// MARK: - Properties
 	private let locationManager: CLLocationManager = CLLocationManager()
 	private var hourlyData: [HourWeather] = []
 	private var weeklyData: [ForecastDay] = []
@@ -101,7 +102,7 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 		activityIndicator.startAnimating()
 		return activityIndicator
 	}()
-	
+	// MARK: - Lifecycle
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		setupUI()
@@ -115,7 +116,7 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 		locationManager.requestWhenInUseAuthorization()
 		locationManager.startUpdatingLocation()
 	}
-	
+	// MARK: - UI Setup
 	private func setupUI() {
 		view.addSubview(backgroundImage)
 		view.addSubview(cityLabel)
@@ -165,7 +166,7 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 			activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
 		])
 	}
-	
+	// MARK: - Network Requests
 	private func fetchWeatherForMoscow() {
 		let moscowLat = 55.7558
 		let moscowLon = 37.6173
@@ -187,10 +188,11 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 					let iconPath = response.current.condition.icon
 					self.weatherIcon.setImage(from: iconPath)
 					self.activityIndicator.stopAnimating()
-				case .failure(let error):
-					self.cityLabel.text = "Ошибка"
+				case .failure:
+					self.cityLabel.text = "Неизвестно"
 					self.temperatureLabel.text = "--°C"
 					self.activityIndicator.stopAnimating()
+					self.showErrorAlert(lat: lat, lon: lon)
 				}
 			}
 		}
@@ -199,29 +201,51 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 	private func fetchForecast(lat: Double, lon: Double) {
 		networkService.fetchForecast(lat: lat, lon: lon) { [weak self] result in
 			DispatchQueue.main.async {
+				guard let self = self else { return }
 				switch result {
 				case .success(let response):
-					self?.forecast = response
-					self?.hourlyData = response.forecast.forecastday.first?.hour ?? []
-					self?.weeklyData = response.forecast.forecastday
-					self?.hourlyCollectionView.reloadData()
-					self?.weeklyCollectionView.reloadData()
-					self?.activityIndicator.stopAnimating()
-				case .failure(let error):
-					self?.hourlyData = []
-					self?.weeklyData = []
-					self?.hourlyCollectionView.reloadData()
-					self?.weeklyCollectionView.reloadData()
-					self?.activityIndicator.stopAnimating()
+					self.forecast = response
+					self.hourlyData = response.forecast.forecastday.first?.hour ?? []
+					self.weeklyData = response.forecast.forecastday
+					self.hourlyCollectionView.reloadData()
+					self.weeklyCollectionView.reloadData()
+					self.activityIndicator.stopAnimating()
+				case .failure:
+					self.hourlyData = []
+					self.weeklyData = []
+					self.hourlyCollectionView.reloadData()
+					self.weeklyCollectionView.reloadData()
+					self.activityIndicator.stopAnimating()
+					self.showErrorAlert(lat: lat, lon: lon)
 				}
 			}
 		}
+	}
+	// MARK: - Alert
+	private func showErrorAlert(lat: Double, lon: Double) {
+		let alert = UIAlertController(
+			title: "Ошибка",
+			message: "Не удалось загрузить данные. Попробовать снова?",
+			preferredStyle: .alert
+		)
+		
+		let retryAction = UIAlertAction(title: "Повторить", style: .default) { [weak self] _ in
+			self?.activityIndicator.startAnimating()
+			self?.fetchCurrentWeather(lat: lat, lon: lon)
+			self?.fetchForecast(lat: lat, lon: lon)
+		}
+		
+		let cancelAction = UIAlertAction(title: "Отмена", style: .cancel)
+		
+		alert.addAction(retryAction)
+		alert.addAction(cancelAction)
+		
+		present(alert, animated: true)
 	}
 	
 	// MARK: - CLLocationManagerDelegate
 	func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
 		guard let currentLocation = locations.last else {
-			print("Не удалось получить местоположение из списка локаций")
 			fetchWeatherForMoscow()
 			return
 		}
@@ -251,7 +275,7 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 		}
 	}
 }
-
+// MARK: - UICollectionView methods
 extension ViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 	func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
 		if collectionView == hourlyCollectionView {
