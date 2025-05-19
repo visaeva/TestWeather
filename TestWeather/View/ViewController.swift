@@ -182,11 +182,11 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 	}
 	
 	private func fetchCurrentWeather(lat: Double, lon: Double) {
-		networkService.fetchCurrentWeather(lat: lat, lon: lon) { [weak self] result in
-			DispatchQueue.main.async {
-				guard let self = self else { return }
-				switch result {
-				case .success(let response):
+		Task {
+			do {
+				let response = try await networkService.fetchCurrentWeather(lat: lat, lon: lon)
+				DispatchQueue.main.async { [weak self] in
+					guard let self = self else { return }
 					self.currentWeather = response
 					self.cityLabel.text = response.location.name
 					self.temperatureLabel.text = "\(Int(response.current.tempC))°C"
@@ -194,7 +194,10 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 					let iconPath = response.current.condition.icon
 					self.weatherIcon.setImage(from: iconPath)
 					self.activityIndicator.stopAnimating()
-				case .failure:
+				}
+			} catch {
+				DispatchQueue.main.async { [weak self] in
+					guard let self = self else { return }
 					self.cityLabel.text = "Неизвестно"
 					self.temperatureLabel.text = "--°C"
 					self.activityIndicator.stopAnimating()
@@ -205,16 +208,19 @@ final class ViewController: UIViewController, CLLocationManagerDelegate {
 	}
 	
 	private func fetchForecast(lat: Double, lon: Double) {
-		networkService.fetchForecast(lat: lat, lon: lon) { [weak self] result in
-			DispatchQueue.main.async {
-				guard let self = self else { return }
-				switch result {
-				case .success(let response):
+		Task {
+			do {
+				let response = try await networkService.fetchForecast(lat: lat, lon: lon)
+				DispatchQueue.main.async { [weak self] in
+					guard let self = self else { return }
 					self.forecast = response
 					self.hourlyData = response.forecast.forecastday.count >= 2 ? self.filterHourlyData(from: response.forecast.forecastday) : []
 					self.weeklyData = response.forecast.forecastday
 					self.updateUI()
-				case .failure:
+				}
+			} catch {
+				DispatchQueue.main.async { [weak self] in
+					guard let self = self else { return }
 					self.hourlyData = []
 					self.weeklyData = []
 					self.updateUI()
